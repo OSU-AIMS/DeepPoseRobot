@@ -16,11 +16,11 @@ import shutil
 from pixellib.custom_train import instance_custom_training
 
 from robotpose import Dataset
-import robotpose.paths as p
+from robotpose.paths import Paths as p
 
 
-def train(dataset, skeleton, batch, valid):
-    ds = Dataset(dataset, skeleton, ds_type='train')
+def train(dataset, batch, valid, classes):
+    ds = Dataset(dataset)
 
     print("Splitting up data...")
     # Split set into validation and train
@@ -53,21 +53,25 @@ def train(dataset, skeleton, batch, valid):
         open(default_model_path, 'wb').write(r.content)
 
     train_maskrcnn = instance_custom_training()
-    train_maskrcnn.modelConfig(network_backbone = "resnet101", num_classes = 1, batch_size = batch)
+    train_maskrcnn.modelConfig(network_backbone = "resnet101", num_classes = classes, batch_size = batch)
     train_maskrcnn.load_pretrained_model(default_model_path)
 
+
+    pth = os.path.abspath(p().SEG_MODELS)     
+    if classes > 1:
+        pth = os.path.join(os.path.abspath(p().SEG_MODELS)  ,'multi')
     #Train
     train_maskrcnn.load_dataset(ds.seg_anno_path)
-    train_maskrcnn.train_model(num_epochs = 300, augmentation=True,  path_trained_models = p.SEG_MODELS)
+    train_maskrcnn.train_model(num_epochs = 300, augmentation=True,  path_trained_models = pth)
 
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('dataset', type=str, default="set6", help="The dataset to load to annotate. Can be a partial name.")
-    parser.add_argument('skeleton', type=str, default="B", help="The skeleton to use for annotation.")
-    parser.add_argument('--batch',type=int, choices=[1,2,4,8,12,16], default=2, help="Batch size for training")
-    parser.add_argument('--valid',type=float, default=.15, help="Validation size for training")
+    parser.add_argument('-batch',type=int, choices=[1,2,4,8,12,16], default=2, help="Batch size for training")
+    parser.add_argument('-valid',type=float, default=.2, help="Validation size for training")
+    parser.add_argument('-classes',type=int, default=1, help="Class number for training")
     args = parser.parse_args()
 
-    train(args.dataset, args.skeleton, args.batch, args.valid)
+    train(args.dataset, args.batch, args.valid, args.classes)

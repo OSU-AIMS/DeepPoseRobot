@@ -101,9 +101,9 @@
             "predictors": {
                 "A": { "from": "L", "to": "U", "length": 0.4, "offset": 0 },
                 "B": { "from": "L", "to": "LU", "length": 0.2, "offset": 0 },
-                "C": { "from": "L", "to": "LU", "length": 0.2, "offset": 0 },
+                "C": { "from": "LU", "to": "U", "length": 0.2, "offset": 0 },
                 "D": { "from": "L_back", "to": "L_back_up", "length": 0.12, "offset": 0 },
-                "E": { "from": "L_front", "to": "L_front", "length": 0.08, "offset": 0 }
+                "E": { "from": "L_front", "to": "L_front_up", "length": 0.08, "offset": 0 }
             }
         },
         "U": {

@@ -24,7 +24,11 @@ def label(args):
         key.run()
         del key
     if not args.no_seg:
-        seg = AutomaticSegmentationAnnotator(args.dataset, args.skeleton, renderer = rend, preview = not args.no_preview)
+        if args.per_joint:
+            mode = 'seg'
+        else:
+            mode = 'seg_full'
+        seg = AutomaticSegmentationAnnotator(args.dataset, args.skeleton, renderer = rend, preview = not args.no_preview, mode=mode)
         seg.run()
 
 
@@ -34,6 +38,7 @@ if __name__ == "__main__":
     parser.add_argument('skeleton', type=str, default="B", help="The skeleton to use for annotation.")
     parser.add_argument('-no_preview', action="store_true", help="Disables preview.")
     parser.add_argument('-no_seg', action="store_true", help="Disables segmentation annotation.")
-    parser.add_argument('-no_key', action="store_true", help="Disables segmentation annotation.")
+    parser.add_argument('-no_key', action="store_true", help="Disables keypoint annotation.")
+    parser.add_argument('-per_joint', action="store_true", help="Labels segmentation per-joint.")
     args = parser.parse_args()
     label(args)

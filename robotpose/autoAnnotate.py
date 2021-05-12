@@ -187,7 +187,10 @@ class AutomaticSegmentationAnnotator():
             self.rend.setMode(mode)
 
         color_dict = self.rend.getColorDict()
-        self.anno = SegmentationAnnotator(color_dict = color_dict)
+        pad = 5
+        if mode == 'seg':
+            pad = 0
+        self.anno = SegmentationAnnotator(color_dict = color_dict, pad_size=pad)
 
         self.ds = Dataset(dataset, skeleton)
 
@@ -210,9 +213,12 @@ class AutomaticSegmentationAnnotator():
 
         cv2.destroyAllWindows()
         inputs = []
+        print("Copying Image Array...")
+        og_img = np.copy(self.ds.og_img)
+        print("Image Array Copied.")
 
         for frame in tqdm(range(self.ds.length),desc="Packing Segmentation Pool"):
-            inputs.append((self.ds.og_img[frame],color_imgs[frame],os.path.join(self.ds.seg_anno_path,f"{frame:05d}")))
+            inputs.append((og_img[frame],color_imgs[frame],os.path.join(self.ds.seg_anno_path,f"{frame:05d}")))
 
         print("Starting Segmentation Pool...")
         with mp.Pool(workerCount()) as pool:
@@ -223,34 +229,30 @@ class AutomaticSegmentationAnnotator():
 
 class KeypointAnnotator():
 
-    def __init__(self, color_dict, dataset, skeleton):
+    def __init__(self, color_dict):
         self.color_dict = color_dict
-        self.ds = Dataset(dataset, skeleton)
-        self.ds.makeDeepPoseDS()    # Make sure there is already a valid deeppose DS for the DS
-        self.dpds = h5py.File(self.ds.deepposeds_path, 'r+')
 
     def setDict(self, color_dict):
         self.color_dict = color_dict
 
-    def annotate(self, render, idx):
+    def annotate(self, render, roi_1):
         anno = []
         vis = []
-        for color, subidx in zip(self.color_dict.values(), range(len(self.color_dict.values()))):
+        for color in self.color_dict.values():
             if self._isVisible(render, color):
                 anno.append(self._getColorMidpoint(render, color))
                 vis.append(True)
             else:
-                anno.append([0,0])
+                anno.append([roi_1,0])
                 vis.append(False)
-        vis = np.array(vis)
-        anno = np.array(anno)
-        anno[:,0] -= self.ds.rois[idx,1] # This used to be crop data, so it would be rois[idx, 1]
 
-        self.dpds['annotated'][idx] = vis
-        self.dpds['annotations'][idx] = anno
+        anno = np.array(anno)
+        anno[:,0] -= roi_1
+
+        return [vis, anno]
 
     def _isVisible(self,image,color):
-        return len(np.where(np.all(image == color, axis=-1))[0]) > 0
+        return len(np.where(np.all(image == color, axis=-1))[0]) > 10
     
     def _getColorMidpoint(self, image, color):
         coords = np.where(np.all(image == color, axis=-1))
@@ -260,7 +262,7 @@ class KeypointAnnotator():
 
 
 
-class AutomaticKeypointAnnotator(KeypointAnnotator):
+class AutomaticKeypointAnnotator():
     
     def __init__(
             self,
@@ -283,7 +285,6 @@ class AutomaticKeypointAnnotator(KeypointAnnotator):
                 Whether or not to show the render as it is created.
         """
         
-        
         self.preview = preview
 
         if renderer is None:
@@ -297,16 +298,40 @@ class AutomaticKeypointAnnotator(KeypointAnnotator):
             self.rend.setMode('key')
 
         color_dict = self.rend.getColorDict()
-        super().__init__(color_dict,dataset,skeleton)
+        self.an = KeypointAnnotator(color_dict)
+        self.ds = Dataset(dataset, skeleton)
 
     def run(self):
 
-        for frame in tqdm(range(self.ds.length),desc="Annotating Keypoints"):
+        renders = []
+
+        for frame in tqdm(range(self.ds.length),desc="Rendering Keypoints"):
             self.rend.setPosesFromDS(frame)
             color,depth = self.rend.render()
-            self.annotate(color,frame)
+            renders.append(color)
             if self.preview:
                 cv2.imshow("Automatic Keypoint Annotator", color)
                 cv2.waitKey(1)
-
         cv2.destroyAllWindows()
+
+        roi_1 = self.ds.rois[:,1]
+        inputs = []
+        for frame in tqdm(range(self.ds.length),desc="Packing Keypoints"):
+            inputs.append([renders[frame], roi_1[frame]])
+
+        print("Starting Pool...")
+        with mp.Pool(workerCount()) as pool:
+            outputs = pool.starmap(self.an.annotate, inputs)
+
+        vis = []
+        anno = []
+        for output in outputs:
+            vis.append(output[0])
+            anno.append(output[1])
+
+        self.ds.makeDeepPoseDS()
+        self.dpds = h5py.File(self.ds.deepposeds_path, 'r+')
+        self.dpds['annotated'][:] = np.array(vis)
+        self.dpds['annotations'][:] = np.array(anno)
+        
+        print("Pool Complete")

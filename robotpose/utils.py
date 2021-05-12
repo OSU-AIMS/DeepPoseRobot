@@ -9,15 +9,12 @@
 
 
 import os
+import string
 
 import numpy as np
 import cv2
-import pyrealsense2 as rs
-from tqdm import tqdm
-from .paths import Paths as p
 import time
-from .projection import makeIntrinsics
-from .turbo_colormap import normalize_and_interpolate
+import matplotlib.pyplot as plt
 
 import multiprocessing as mp
 
@@ -35,13 +32,12 @@ def setMemoryGrowth():
 
 def workerCount():
     cpu_count = mp.cpu_count()
-    return int(min(cpu_count - 2, .75 * cpu_count))
+    return int(min(cpu_count - 2, .85 * cpu_count))
 
 
 def expandRegion(image, size, iterations = 1):
     kern = np.ones((size,size), dtype=np.uint8)
     return cv2.dilate(image, kern, iterations = iterations)
-
 
 
 
@@ -82,141 +78,6 @@ def XYZangle(start, end, lims = None):
     return XYangle(rotated_x, rotated_y, lims)
 
 
-
-def predToDictList(preds):
-    """
-    Takes predictions from DeepPoseKit as list and translates into a dictionary of points
-    """
-    out = []
-    for p in preds:
-        out.append({'L':p[0],
-                    'midL':p[1],
-                    'U':p[2],
-                    'R':p[3],
-                    'B':p[4],
-                    'T':p[5]})
-    return out
-
-
-def predToDictList_new(preds):
-    """
-    Takes predictions from DeepPoseKit as list and translates into a dictionary of points
-    """
-    out = []
-    for p in preds:
-        out.append({'base':p[0],
-                    'L':p[1],
-                    'U':p[2],
-                    'R':p[3],
-                    'B':p[4]})
-    return out
-    
-
-def viz(image, over, frame_data):
-    """
-    Draws a pose overlay on the image given prediction point data
-    """
-    last = None
-    for p in frame_data:
-        x = int(p[0])
-        y = int(p[1])
-
-        if last is not None:
-            image = cv2.line(image, (x,y), last, color=(255, 0, 0), thickness=3)
-            over = cv2.line(over, (x,y), last, color=(255, 0, 0), thickness=3)
-
-        image = cv2.circle(image, (x,y), radius=4, color=(0, 0, 255), thickness=-1)
-        over = cv2.circle(over, (x,y), radius=4, color=(0, 0, 255), thickness=-1)
-        last = (x,y)
-
-
-
-def predToXYZdict(dict_list, ply_data):
-    """
-    Using the complete list of dictionaries and 3D data, find the XYZ coords of each keypoint 
-    """
-    ply_data = np.asarray(ply_data)
-    out = []
-    for d, idx in tqdm(zip(dict_list,range(len(dict_list)))):
-        data = ply_data[idx]
-        x_list = data[:,0]
-        y_list = data[:,1]
-        out_dict = {}
-        for key, value in zip(d.keys(), d.values()):
-            px = value[0]
-            py = value[1]
-            dist = np.sqrt( np.square( x_list - px ) + np.square( y_list - py ) )
-            min_idx = dist.argmin()
-            out_dict[key] = tuple(data[min_idx,2:5])
-        
-        out.append(out_dict)
-
-    return out
-
-
-def predToXYZdict_new(dict_list, ply_data):
-    """
-    Using the complete list of dictionaries and 3D data, find the XYZ coords of each keypoint 
-    """
-    ply_data = np.asarray(ply_data)
-    out = []
-    for d, idx in tqdm(zip(dict_list,range(len(dict_list)))):
-        data = ply_data[idx]
-        out_dict = {}
-        for key, value in zip(d.keys(), d.values()):
-            px = int(value[0])
-            py = int(value[1])
-            out_dict[key] = tuple(data[py,px])
-        
-        out.append(out_dict)
-
-    return out
-
-
-def predToXYZ(preds, ply_data):
-    ply_data = np.asarray(ply_data)
-    # Make sure there are the same number of frame predictions as ply frames
-    assert len(preds) == ply_data.shape[0]
-
-    # Create output array
-    out = np.zeros((ply_data.shape[0], len(preds[0]), 3))
-
-    # Go through each frame
-    for pred, ply, idx in zip(preds, ply_data, range(len(preds))):
-        x_list = ply[:,0]
-        y_list = ply[:,1]
-
-        # Go through each point in the frame
-        for point, sub_idx in zip(pred, range(len(pred))):
-            px, py = point[0:2]
-
-            # Find closest point
-            dist = np.sqrt( np.square( x_list - px ) + np.square( y_list - py ) )
-            min_idx = dist.argmin()
-            out[idx,sub_idx] = tuple(ply[min_idx,2:5])
-
-    return out
-
-
-
-
-def vizDepth_new(ply_frame_data, image):
-    """
-    Overlays the depth information given on an image
-    """
-    z_min, z_max = outlier_min_max(ply_frame_data[:,4], iqr_mult=3.0)
-    idx_arr = ply_frame_data[:,0:2].astype(int)
-    #print(f"Min: {np.min(ply_frame_data[:,4])}\t{z_min}\nMax: {np.max(ply_frame_data[:,4])}\t{z_max}\n")
-    for idx in range(len(ply_frame_data)):
-        color = normalize_and_interpolate(ply_frame_data[idx,4], z_min, z_max)
-        color.reverse() # Switch from BGR/RGB
-        image = cv2.circle(image, (idx_arr[idx,0],idx_arr[idx,1]), radius=1, color=color, thickness=-1)
-
-    # plt.hist(ply_frame_data[:,4], bins=200)
-    # plt.yscale('log')
-    # plt.show()
-
-    return image
 
 def reject_outliers_std(data, m=2):
     return data[abs(data - np.mean(data)) < m * np.std(data)]
@@ -263,46 +124,166 @@ class Timer():
 
 
 
-def vizDepth(ply_frame_data, image, x_crop):
-    """
-    Overlays the depth information given on an image
-    """
-    intrin = makeIntrinsics()
-    for pt in ply_frame_data:
-        x, y = rs.rs2_project_point_to_pixel(intrin, pt[2:5])
-        x = int(x)-x_crop
-        y = int(y)
-        g = int(np.interp(pt[4],[-1.3,-.9],[0,255]))
-        r = 255-2*g
-        image = cv2.circle(image, (x,y), radius=0, color=(0,g,r), thickness=-1)
 
 
 
+class Grapher():
+
+    def __init__(self, joints, prediction_history, ds_angles = None, joint_predictions = None):
+        self.joints = joints
+        self._convertToMatrix(prediction_history, joints)
+        self.compare = ds_angles is not None
+        if ds_angles is not None:
+            self._cropComparison(ds_angles,joints,prediction_history)
+        if joint_predictions is not None:
+            self._convertJointToMatricies(joint_predictions,joints)
+
+
+    
+    def plot(self,ylim=None):
+        self._plotWithComparison(ylim)
+
+    def plotJoint(self,joint,ylim=None):
+        self._plotSingleJoint(joint,ylim)
+
+
+    def _convertToMatrix(self, prediction_history, joints):
+        # Convert into a L X N matrix (N is # of joint, L is prediction length)
+        self.angles = np.zeros((len(prediction_history),len(joints)))
+        self.percent_estimated = np.copy(self.angles)
+
+        for idx in range(len(prediction_history)):
+            for joint, subidx in zip(joints, range(len(joints))):
+                self.angles[idx,subidx] = prediction_history[idx][joint]['val']
+                self.percent_estimated[idx,subidx] = prediction_history[idx][joint]['percent_est']
+
+        self.angles = np.degrees(self.angles)
+
+
+    def _convertJointToMatricies(self, joint_predictions, joints):
+        self.joint_data = {}
+        for joint in joints:
+            self.joint_data[joint] = {
+                "values": np.array(joint_predictions[joint]["values"]),
+                "multipliers": np.array(joint_predictions[joint]["multipliers"]),
+                "estimated": np.array(joint_predictions[joint]["estimated"]),
+            }
+
+
+    def _cropComparison(self, ds_angles, joints, prediction_history):
+        ang = ['S','L','U','R','B','T']
+        l = len(prediction_history)
+        self.real_angles = np.zeros((len(prediction_history),len(joints)))
+        for joint, idx in zip(joints,range(len(joints))):
+            self.real_angles[:,idx] = ds_angles[:l,ang.index(joint)]
+        
+        self.real_angles = np.degrees(self.real_angles)
+
+
+    def _plotWithComparison(self, y_lim = None):
+
+        fig, axs = plt.subplots(len(self.joints),2)
+
+                
+        # Plot Raw Angles
+        for joint, idx in zip(self.joints,range(len(self.joints))):
+            axs[idx,0].set_title(f'Raw {joint} Angle')
+            axs[idx,0].plot(self.real_angles[:,idx])
+            axs[idx,0].plot(self.angles[:,idx],color='purple')
+            for val,x in zip(self.percent_estimated[:,idx], range(len(self.percent_estimated[:,idx]))):
+                axs[idx,0].axvspan(x-.5, x+.5, color='red', alpha=val, ec=None)
+
+        err = self.angles - self.real_angles
+        zeros_err = np.zeros(err.shape[0])
+
+        # Plot errors
+        for joint, idx in zip(self.joints,range(len(self.joints))):
+            axs[idx,1].set_title(f'Angle {joint} Error')
+            axs[idx,1].plot(zeros_err)
+            axs[idx,1].plot(err[:,idx],color='purple')
+            if y_lim is not None:
+                axs[idx,1].set_ylim([-y_lim,y_lim])
+            for val,x in zip(self.percent_estimated[:,idx], range(len(self.percent_estimated[:,idx]))):
+                axs[idx,1].axvspan(x-.5, x+.5, color='red', alpha=val, ec=None)
+
+
+        avg_err = np.mean(np.abs(err),0)
+        avg_err_std = np.std(np.abs(err),0)
+
+
+        print("\nAvg Error (deg):")
+        for joint, idx in zip(self.joints,range(len(self.joints))):
+            print(f"\t{joint}: {avg_err[idx]:.2f}")
+
+        print("Stdev (deg):")
+        for joint, idx in zip(self.joints,range(len(self.joints))):
+            print(f"\t{joint}: {avg_err_std[idx]:.2f}")
+
+
+        # # Determine average errors without outliers
+        # avg_err_no_outliers = np.mean(reject_outliers_iqr(np.abs(err)))
+        # avg_L_err = np.mean(reject_outliers_iqr(np.abs(L_err)))
+        # avg_U_err = np.mean(reject_outliers_iqr(np.abs(U_err)))
+        # #avg_B_err = np.mean(np.abs(B_err))
+        # S_err_std = np.std(reject_outliers_iqr(np.abs(S_err)))
+        # L_err_std = np.std(reject_outliers_iqr(np.abs(L_err)))
+        # U_err_std = np.std(reject_outliers_iqr(np.abs(U_err)))
+        # #B_err_std = np.std(np.abs(B_err))
+
+        # print("\nOutliers Removed:")
+        # print("Avg Error (deg):")
+        # print(f"\tS: {avg_S_err:.2f}\n\tL: {avg_L_err:.2f}\n\tU: {avg_U_err:.2f}")
+        # print("Stdev (deg):")
+        # print(f"\tS: {S_err_std:.2f}\n\tL: {L_err_std:.2f}\n\tU: {U_err_std:.2f}")
+
+        plt.show()
 
 
 
-"""
-DEPRECATED FUNCTIONS
-These functions are in the process of being replaced by the dataset class
-"""
+    def _plotSingleJoint(self, joint, y_lim = None):
+
+        fig, axs = plt.subplots(2)
+                
+        vals = np.array(self.joint_data[joint]["values"])
+        mults = np.array(self.joint_data[joint]["multipliers"])
+        vals *= 180/np.pi
+        vals[vals==0] = np.nan
+        mults[mults==0] = np.nan
+
+        # # Plot Raw Angles
+        # axs[0].set_title(f'Raw {joint} Angle')
+        # axs[0].plot(self.real_angles[:,self.joints.index(joint)], label="Act.")
+        # for idx in range(vals.shape[1]):
+        #     axs[0].plot(vals[:,idx],label=list(string.ascii_uppercase)[idx])
+        # axs[0].legend()
+
+        axs[0].set_title(f'Multipliers')
+        for idx in range(vals.shape[1]):
+            axs[0].plot(mults[:,idx],label=list(string.ascii_uppercase)[idx])
+        axs[0].legend()
+
+        err = vals - np.vstack([self.real_angles[:,self.joints.index(joint)]]*vals.shape[1]).transpose()
+        zeros_err = np.zeros(err.shape[0])
 
 
-def vizDepth_old(ply_frame_data, image):
-    """
-    Overlays the depth information given on an image
-    """
-    intrin = makeIntrinsics()
-    for pt in ply_frame_data:
-        x, y = rs.rs2_project_point_to_pixel(intrin, pt[2:5])
-        x = int(x)
-        y = int(y)
-        g = int(np.interp(pt[4],[-1.3,-.9],[0,255]))
-        r = 255-2*g
-        image = cv2.circle(image, (x,y), radius=0, color=(0,g,r), thickness=-1)
+        axs[1].set_title(f'Angle {joint} Error')
+        axs[1].plot(zeros_err, label="Act.")
+        # Plot errors
+        for idx in range(err.shape[1]):
+            axs[1].plot(err[:,idx],label=list(string.ascii_uppercase)[idx])
+        if y_lim is not None:
+            axs[1].set_ylim([-y_lim,y_lim])
+        axs[1].legend()
 
+        # avg_err = np.mean(np.abs(err),0)
+        # avg_err_std = np.std(np.abs(err),0)
 
+        # print("\nAvg Error (deg):")
+        # for joint, idx in zip(self.joints,range(len(self.joints))):
+        #     print(f"\t{joint}: {avg_err[idx]:.2f}")
 
-def renamePNG(path):
-    imgs = [x for x in os.listdir(path) if x.endswith('.png')]
-    for img in imgs:
-        os.rename(os.path.join(path,img),os.path.join(path,img.replace('.png','_rm.png')))
+        # print("Stdev (deg):")
+        # for joint, idx in zip(self.joints,range(len(self.joints))):
+        #     print(f"\t{joint}: {avg_err_std[idx]:.2f}")
+
+        plt.show()

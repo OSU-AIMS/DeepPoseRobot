@@ -1,0 +1,146 @@
+{
+    "markers": { "height": 0.005, "radius": 0.005 },
+    "keypoints": {
+        "base": {
+            "parent_keypoint": null,
+            "parent_link": "base_link",
+            "pose": [0, -0.082, -0.16, 1.5708, 0, 1.5708]
+        },
+        "U": {
+            "parent_keypoint": "LU",
+            "parent_link": "link_u",
+            "pose": [0, -0.11, 0, 1.5708, 0, 1.5708]
+        },
+        "R": {
+            "parent_keypoint": "UR",
+            "parent_link": "link_r",
+            "pose": [-0.233, -0.0525, 0, 1.5708, 0, 1.5708]
+        },
+        "B": {
+            "parent_keypoint": "RB",
+            "parent_link": "link_b",
+            "pose": [0, -0.055, 0, 1.5708, 0, 1.5708]
+        },
+        "LU": {
+            "parent_keypoint": "L",
+            "parent_link": "link_l",
+            "pose": [0, -0.11, 0.2, 1.5708, 0, 1.5708]
+        },
+        "RB": {
+            "parent_keypoint": "R",
+            "parent_link": "link_r",
+            "pose": [-0.116, -0.055, 0, 1.5708, 0, 1.5708]
+        },
+        "UR": {
+            "parent_keypoint": "U",
+            "parent_link": "link_r",
+            "pose": [-0.3, -0.0475, 0, 1.5708, 0, 1.5708]
+        },
+        "L": {
+            "parent_keypoint": "base",
+            "parent_link": "link_l",
+            "pose": [0, -0.11, 0, 1.5708, 0, 1.5708]
+        },
+        "L_back": {
+            "parent_keypoint": "base",
+            "parent_link": "link_l",
+            "pose": [-0.053, 0, 0.08, 1.5708, 1.5708, 1.5708]
+        },
+        "L_back_up": {
+            "parent_keypoint": "L_back",
+            "parent_link": "link_l",
+            "pose": [-0.053, 0, 0.2, 1.5708, 1.5708, 1.5708]
+        },
+        "L_front": {
+            "parent_keypoint": "base",
+            "parent_link": "link_l",
+            "pose": [0.04, 0, 0.11, 1.5708, 1.5708, 1.5708]
+        },
+        "L_front_up": {
+            "parent_keypoint": "L_front",
+            "parent_link": "link_l",
+            "pose": [0.04, 0, 0.19, 1.5708, 1.5708, 1.5708]
+        },
+        "R_under": {
+            "parent_keypoint": "R",
+            "parent_link": "link_r",
+            "pose": [-0.233, 0, -0.05, 3.14159, 0, 1.5708]
+        },
+        "RB_under": {
+            "parent_keypoint": "R_under",
+            "parent_link": "link_r",
+            "pose": [-0.116, 0, -0.05, 0, 0, 1.5708]
+        }
+    },
+    "joints": {
+        "S": {
+            "type": 2,
+            "max": 2.967,
+            "min": -2.967,
+            "parent": null,
+            "parent_mult": 0,
+            "offset": 0,
+            "self_mult": 1,
+            "predictors": {
+                "A": { "from": "L", "to": "U", "length": 0.4, "offset": 0 },
+                "B": { "from": "L", "to": "LU", "length": 0.2, "offset": 0 },
+                "C": { "from": "LU", "to": "U", "length": 0.2, "offset": 0 },
+                "D": { "from": "R", "to": "B", "length": 0.233, "offset": 0 },
+                "E": { "from": "R", "to": "RB", "length": 0.117, "offset": 0 },
+                "F": { "from": "RB", "to": "B", "length": 0.116, "offset": 0 }
+
+            }
+        },
+        "L": {
+            "type": 1,
+            "max": 2.618,
+            "min": -1.1345,
+            "parent": null,
+            "parent_mult": 0,
+            "offset": 1.57,
+            "self_mult": -1,
+            "predictors": {
+                "A": { "from": "L", "to": "U", "length": 0.4, "offset": 0 },
+                "B": { "from": "L", "to": "LU", "length": 0.2, "offset": 0 },
+                "C": { "from": "LU", "to": "U", "length": 0.2, "offset": 0 },
+                "D": { "from": "L_back", "to": "L_back_up", "length": 0.12, "offset": 0 },
+                "E": { "from": "L_front", "to": "L_front_up", "length": 0.08, "offset": 0 }
+            }
+        },
+        "U": {
+            "type": 1,
+            "max": 4.4506,
+            "min": -2.409,
+            "parent": "L",
+            "parent_mult": 1,
+            "offset": 0,
+            "self_mult": 1,
+            "predictors": {
+                "A": { "from": "R", "to": "B", "length": 0.233, "offset": 0 },
+                "B": { "from": "R", "to": "RB", "length": 0.117, "offset": 0 },
+                "C": { "from": "RB", "to": "B", "length": 0.116, "offset": 0 },
+                "D": { "from": "R_under", "to": "RB_under", "length": 0.117, "offset": 0 }
+            }
+        },
+        "R": {
+            "type": 3,
+            "max": 3.3161,
+            "min": -3.3161,
+            "parent": null,
+            "parent_mult": 0,
+            "offset": 0,
+            "self_mult": 1,
+            "predictors": {}
+        },
+        "B": {
+            "type": 1,
+            "max": 2.356,
+            "min": -2.356,
+            "parent": "R",
+            "parent_mult": 1,
+            "offset": 0,
+            "self_mult": 1,
+            "predictors": {}
+        }
+    }
+}

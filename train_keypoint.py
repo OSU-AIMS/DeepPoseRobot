@@ -84,6 +84,10 @@ def run(dataset, skeleton, model_type, batch_size, valid_size):
     callbacks = [logger, early_stop, reduce_lr, model_checkpoint]
     print("Callbacks set")
 
+
+    import webbrowser
+    webbrowser.open('https://www.youtube.com/watch?v=IkdmOVejUlI')
+
     model.fit(
         batch_size=batch_size,
         validation_batch_size=batch_size,
@@ -102,7 +106,7 @@ if __name__ == "__main__":
                         default='StackedDensenet', help="The type of model to train."
                         )
     parser.add_argument('--batch',type=int, choices=[1,2,4,8,12,16], default=2, help="Batch size for training")
-    parser.add_argument('--valid',type=float, default=0.3, help="Validation size for training")
+    parser.add_argument('--valid',type=float, default=0.2, help="Validation size for training")
     args = parser.parse_args()
 
     run(args.set, args.skeleton, args.model, args.batch, args.valid)
