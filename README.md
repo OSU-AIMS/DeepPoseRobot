@@ -1,6 +1,8 @@
-# DeepPoseRobot, an implementation of DeepPoseKit
+# Deprecation Notice
 
-To see rendering examples, open [Render_Examples.md](https://github.com/AdamExley/DeepPoseRobot/blob/main/Render_Examples.md)
+**This repository is no longer in use, and exists for reference only. The approaches used in this implementation were found to be suboptimal and inferior to other methods.**
+
+# DeepPoseRobot, an implementation of DeepPoseKit
 
 This is an adaptation of both [DeepPoseKit](https://deepposekit.org) and [PixelLib](https://github.com/ayoolaolafenwa/PixelLib) to predict robot joint angles.
 
@@ -26,9 +28,7 @@ Meshes are loaded from a robot's URDF.
 
 The URDF can be changed via the wizard: ```python wizard.py```
 
-The mesh for each joint, as well as that mesh's specific name, is specified in ```mesh_config.json``` in the ```data``` directory.
-
-More details about mesh configuration can be found in that directory's README.
+The mesh for each joint, as well as that mesh's specific name and static relative pose, is specified in ```mesh_config.json``` in the ```data``` directory.
 
 ## Skeletons
 
